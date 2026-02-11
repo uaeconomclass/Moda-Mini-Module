@@ -26,12 +26,28 @@ class Moda_Stylist_Repository {
         string $q = '',
         string $sort = 'updated_at',
         string $celebrity_filter = '',
-        ?int $stylist_id = null
+        ?int $stylist_id = null,
+        string $order = ''
     ): array {
         $page = max(1, $page);
         $per_page = max(1, min(100, $per_page));
         $offset = ($page - 1) * $per_page;
-        $sort_sql = $sort === 'name' ? 's.full_name ASC' : 's.updated_at DESC';
+        $sort_map = array(
+            'id' => 's.id',
+            'name' => 's.full_name',
+            'full_name' => 's.full_name',
+            'email' => 's.email',
+            'phone' => 's.phone',
+            'updated_at' => 's.updated_at',
+            'celebrity_count' => 'celebrity_count',
+        );
+        $sort_column = $sort_map[$sort] ?? $sort_map['updated_at'];
+        if ($order === '') {
+            $sort_dir = in_array($sort, array('name', 'full_name'), true) ? 'ASC' : 'DESC';
+        } else {
+            $sort_dir = strtoupper($order) === 'ASC' ? 'ASC' : 'DESC';
+        }
+        $sort_sql = "{$sort_column} {$sort_dir}, s.id DESC";
 
         $joins = '';
         $where_parts = array('1=1');
@@ -108,11 +124,23 @@ class Moda_Stylist_Repository {
         int $page = 1,
         int $per_page = 20,
         string $q = '',
-        ?int $celebrity_id = null
+        ?int $celebrity_id = null,
+        string $sort = 'full_name',
+        string $order = 'asc'
     ): array {
         $page = max(1, $page);
         $per_page = max(1, min(100, $per_page));
         $offset = ($page - 1) * $per_page;
+        $sort_map = array(
+            'id' => 'c.id',
+            'full_name' => 'c.full_name',
+            'industry' => 'c.industry',
+            'updated_at' => 'c.updated_at',
+            'stylist_count' => 'stylist_count',
+        );
+        $sort_column = $sort_map[$sort] ?? $sort_map['full_name'];
+        $sort_dir = strtoupper($order) === 'DESC' ? 'DESC' : 'ASC';
+        $sort_sql = "{$sort_column} {$sort_dir}, c.id DESC";
 
         $where_parts = array('1=1');
         $params = array();
@@ -144,7 +172,7 @@ class Moda_Stylist_Repository {
             LEFT JOIN {$this->links_table} l ON l.celebrity_id = c.id
             WHERE {$where_sql}
             GROUP BY c.id
-            ORDER BY c.full_name ASC
+            ORDER BY {$sort_sql}
             LIMIT %d OFFSET %d";
 
         $data_params = $params;

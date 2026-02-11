@@ -49,6 +49,7 @@ Menu: `Moda Database`
 1. Search by stylist name
 2. Filter by stylist ID
 2. Filter by celebrity (ID or name)
+3. Sort by table headers (ID, Name, Email, Phone, Updated, Celebrities)
 3. Pagination
 4. Click row name to open detail page
 2. **Stylist Detail**
@@ -59,6 +60,7 @@ Menu: `Moda Database`
 3. **Celebrities List**
 1. Filter by celebrity ID
 2. Search by celebrity name
+3. Sort by table headers (ID, Name, Industry, Stylist Count, Updated)
 3. Pagination
 4. Open related stylists by celebrity
 

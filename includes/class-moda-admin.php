@@ -182,9 +182,24 @@ class Moda_Admin {
         $q = isset($_GET['q']) ? sanitize_text_field(wp_unslash((string) $_GET['q'])) : '';
         $celebrity = isset($_GET['celebrity']) ? sanitize_text_field(wp_unslash((string) $_GET['celebrity'])) : '';
         $stylist_id = isset($_GET['stylist_id']) ? (int) $_GET['stylist_id'] : 0;
+        $orderby = isset($_GET['orderby']) ? sanitize_text_field(wp_unslash((string) $_GET['orderby'])) : 'updated_at';
+        $order = isset($_GET['order']) ? sanitize_text_field(wp_unslash((string) $_GET['order'])) : 'desc';
         $page = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
+        $allowed_orderby = array('id', 'name', 'email', 'phone', 'updated_at', 'celebrity_count');
+        if (!in_array($orderby, $allowed_orderby, true)) {
+            $orderby = 'updated_at';
+        }
+        $order = strtolower($order) === 'asc' ? 'asc' : 'desc';
 
-        $result = $this->repository->list_stylists($page, 20, $q, 'updated_at', $celebrity, $stylist_id > 0 ? $stylist_id : null);
+        $result = $this->repository->list_stylists(
+            $page,
+            20,
+            $q,
+            $orderby,
+            $celebrity,
+            $stylist_id > 0 ? $stylist_id : null,
+            $order
+        );
         $items = $result['items'];
         $meta = $result['meta'];
 
@@ -204,12 +219,26 @@ class Moda_Admin {
         echo '<label for="celebrity"><strong>Filter by celebrity:</strong></label> ';
         echo '<input id="celebrity" type="text" name="celebrity" value="' . esc_attr($celebrity) . '" placeholder="ID or name" />';
         echo '&nbsp;&nbsp;<button class="button button-primary" type="submit">Filter</button>';
+        $clear_url = add_query_arg(array('page' => 'moda-database'), admin_url('admin.php'));
+        echo '&nbsp;<a class="button" href="' . esc_url($clear_url) . '">Clear</a>';
         echo '</p>';
         echo '</form>';
 
+        $header_base = array(
+            'page' => 'moda-database',
+            'q' => $q,
+            'celebrity' => $celebrity,
+            'stylist_id' => $stylist_id > 0 ? $stylist_id : '',
+        );
+
         echo '<table class="widefat striped">';
         echo '<thead><tr>';
-        echo '<th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Updated</th><th>Celebrities</th>';
+        $this->render_sortable_header('ID', 'id', $orderby, $order, $header_base);
+        $this->render_sortable_header('Name', 'name', $orderby, $order, $header_base);
+        $this->render_sortable_header('Email', 'email', $orderby, $order, $header_base);
+        $this->render_sortable_header('Phone', 'phone', $orderby, $order, $header_base);
+        $this->render_sortable_header('Updated', 'updated_at', $orderby, $order, $header_base);
+        $this->render_sortable_header('Celebrities', 'celebrity_count', $orderby, $order, $header_base);
         echo '</tr></thead><tbody>';
 
         if (empty($items)) {
@@ -234,6 +263,8 @@ class Moda_Admin {
             'q' => $q,
             'celebrity' => $celebrity,
             'stylist_id' => $stylist_id > 0 ? $stylist_id : '',
+            'orderby' => $orderby,
+            'order' => $order,
         ));
         echo '</div>';
     }
@@ -245,9 +276,23 @@ class Moda_Admin {
 
         $q = isset($_GET['q']) ? sanitize_text_field(wp_unslash((string) $_GET['q'])) : '';
         $celebrity_id = isset($_GET['celebrity_id']) ? (int) $_GET['celebrity_id'] : 0;
+        $orderby = isset($_GET['orderby']) ? sanitize_text_field(wp_unslash((string) $_GET['orderby'])) : 'full_name';
+        $order = isset($_GET['order']) ? sanitize_text_field(wp_unslash((string) $_GET['order'])) : 'asc';
         $page = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
+        $allowed_orderby = array('id', 'full_name', 'industry', 'stylist_count', 'updated_at');
+        if (!in_array($orderby, $allowed_orderby, true)) {
+            $orderby = 'full_name';
+        }
+        $order = strtolower($order) === 'desc' ? 'desc' : 'asc';
 
-        $result = $this->repository->list_celebrities($page, 20, $q, $celebrity_id > 0 ? $celebrity_id : null);
+        $result = $this->repository->list_celebrities(
+            $page,
+            20,
+            $q,
+            $celebrity_id > 0 ? $celebrity_id : null,
+            $orderby,
+            $order
+        );
         $items = $result['items'];
         $meta = $result['meta'];
 
@@ -264,12 +309,25 @@ class Moda_Admin {
         echo '<label for="q"><strong>Search name:</strong></label> ';
         echo '<input id="q" type="text" name="q" value="' . esc_attr($q) . '" />';
         echo '&nbsp;&nbsp;<button class="button button-primary" type="submit">Filter</button>';
+        $clear_url = add_query_arg(array('page' => 'moda-celebrities'), admin_url('admin.php'));
+        echo '&nbsp;<a class="button" href="' . esc_url($clear_url) . '">Clear</a>';
         echo '</p>';
         echo '</form>';
 
+        $header_base = array(
+            'page' => 'moda-celebrities',
+            'q' => $q,
+            'celebrity_id' => $celebrity_id > 0 ? $celebrity_id : '',
+        );
+
         echo '<table class="widefat striped">';
         echo '<thead><tr>';
-        echo '<th>ID</th><th>Name</th><th>Industry</th><th>Stylist Count</th><th>Updated</th><th>Open Stylists</th>';
+        $this->render_sortable_header('ID', 'id', $orderby, $order, $header_base);
+        $this->render_sortable_header('Name', 'full_name', $orderby, $order, $header_base);
+        $this->render_sortable_header('Industry', 'industry', $orderby, $order, $header_base);
+        $this->render_sortable_header('Stylist Count', 'stylist_count', $orderby, $order, $header_base);
+        $this->render_sortable_header('Updated', 'updated_at', $orderby, $order, $header_base);
+        echo '<th>Open Stylists</th>';
         echo '</tr></thead><tbody>';
 
         if (empty($items)) {
@@ -301,6 +359,8 @@ class Moda_Admin {
             'page' => 'moda-celebrities',
             'q' => $q,
             'celebrity_id' => $celebrity_id > 0 ? $celebrity_id : '',
+            'orderby' => $orderby,
+            'order' => $order,
         ));
         echo '</div>';
     }
@@ -536,5 +596,27 @@ class Moda_Admin {
 
         echo '<span style="margin-left:10px;color:#666;">Page ' . (int) $current . ' of ' . (int) $total . '</span>';
         echo '</div></div>';
+    }
+
+    private function render_sortable_header(
+        string $label,
+        string $column,
+        string $current_orderby,
+        string $current_order,
+        array $base_args
+    ): void {
+        $is_current = $current_orderby === $column;
+        $next_order = ($is_current && $current_order === 'asc') ? 'desc' : 'asc';
+        $url = add_query_arg(
+            array_merge($base_args, array('orderby' => $column, 'order' => $next_order, 'paged' => 1)),
+            admin_url('admin.php')
+        );
+
+        $arrow = '';
+        if ($is_current) {
+            $arrow = $current_order === 'asc' ? ' ▲' : ' ▼';
+        }
+
+        echo '<th><a href="' . esc_url($url) . '">' . esc_html($label . $arrow) . '</a></th>';
     }
 }
