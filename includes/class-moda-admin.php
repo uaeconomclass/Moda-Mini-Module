@@ -27,6 +27,16 @@ class Moda_Admin {
             58
         );
 
+        remove_submenu_page('moda-database', 'moda-database');
+        add_submenu_page(
+            'moda-database',
+            'Stylists',
+            'Stylists',
+            'manage_options',
+            'moda-database',
+            array($this, 'render_stylists_page')
+        );
+
         add_submenu_page(
             'moda-database',
             'Celebrities',
