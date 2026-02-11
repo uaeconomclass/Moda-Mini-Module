@@ -139,6 +139,60 @@ class Moda_Admin {
             $this->redirect_with_notice($redirect, 'Celebrity detached.', 'success');
         }
 
+        if ($action === 'update_stylist' && $stylist_id > 0) {
+            if (!$this->repository->stylist_exists($stylist_id)) {
+                $this->redirect_with_notice($redirect, 'Stylist not found.', 'error');
+            }
+
+            $full_name = sanitize_text_field(wp_unslash((string) ($_POST['full_name'] ?? '')));
+            if ($full_name === '') {
+                $this->redirect_with_notice($redirect, 'Stylist name is required.', 'error');
+            }
+
+            $ok = $this->repository->update_stylist($stylist_id, array(
+                'full_name' => $full_name,
+                'email' => sanitize_email(wp_unslash((string) ($_POST['email'] ?? ''))),
+                'phone' => sanitize_text_field(wp_unslash((string) ($_POST['phone'] ?? ''))),
+                'instagram' => sanitize_text_field(wp_unslash((string) ($_POST['instagram'] ?? ''))),
+                'website' => esc_url_raw(wp_unslash((string) ($_POST['website'] ?? ''))),
+            ));
+            if (!$ok) {
+                $this->redirect_with_notice($redirect, 'Failed to update stylist.', 'error');
+            }
+            $this->redirect_with_notice($redirect, 'Stylist updated.', 'success');
+        }
+
+        if ($action === 'create_stylist') {
+            $full_name = sanitize_text_field(wp_unslash((string) ($_POST['full_name'] ?? '')));
+            if ($full_name === '') {
+                $this->redirect_with_notice(
+                    admin_url('admin.php?page=moda-database'),
+                    'Stylist name is required.',
+                    'error'
+                );
+            }
+
+            $new_id = $this->repository->create_stylist(array(
+                'full_name' => $full_name,
+                'email' => sanitize_email(wp_unslash((string) ($_POST['email'] ?? ''))),
+                'phone' => sanitize_text_field(wp_unslash((string) ($_POST['phone'] ?? ''))),
+                'instagram' => sanitize_text_field(wp_unslash((string) ($_POST['instagram'] ?? ''))),
+                'website' => esc_url_raw(wp_unslash((string) ($_POST['website'] ?? ''))),
+            ));
+            if ($new_id <= 0) {
+                $this->redirect_with_notice(
+                    admin_url('admin.php?page=moda-database'),
+                    'Failed to create stylist.',
+                    'error'
+                );
+            }
+            $this->redirect_with_notice(
+                admin_url('admin.php?page=moda-stylist-detail&id=' . $new_id),
+                'Stylist created.',
+                'success'
+            );
+        }
+
         if ($action === 'update_celebrity') {
             $celebrity_id = (int) ($_POST['celebrity_id'] ?? 0);
             if ($celebrity_id <= 0 || !$this->repository->celebrity_exists($celebrity_id)) {
@@ -207,6 +261,22 @@ class Moda_Admin {
         echo '<h1>Moda Database</h1>';
         $this->render_notice();
 
+        echo '<details style="margin-bottom:15px;"><summary class="button button-secondary">+ Add New Stylist</summary>';
+        echo '<div style="background:#fff;border:1px solid #ccd0d4;padding:15px;margin-top:8px;">';
+        echo '<form method="post">';
+        wp_nonce_field('moda_admin_action', 'moda_nonce');
+        echo '<input type="hidden" name="moda_action" value="create_stylist" />';
+        echo '<table class="form-table"><tbody>';
+        echo '<tr><th>Name *</th><td><input type="text" name="full_name" required class="regular-text" /></td></tr>';
+        echo '<tr><th>Email</th><td><input type="email" name="email" class="regular-text" /></td></tr>';
+        echo '<tr><th>Phone</th><td><input type="text" name="phone" class="regular-text" /></td></tr>';
+        echo '<tr><th>Instagram</th><td><input type="text" name="instagram" class="regular-text" /></td></tr>';
+        echo '<tr><th>Website</th><td><input type="url" name="website" class="regular-text" /></td></tr>';
+        echo '</tbody></table>';
+        echo '<button class="button button-primary" type="submit">Create Stylist</button>';
+        echo '</form>';
+        echo '</div></details>';
+
         echo '<form method="get" action="' . esc_url(admin_url('admin.php')) . '">';
         echo '<input type="hidden" name="page" value="moda-database" />';
         echo '<p>';
@@ -223,6 +293,8 @@ class Moda_Admin {
         echo '&nbsp;<a class="button" href="' . esc_url($clear_url) . '">Clear</a>';
         echo '</p>';
         echo '</form>';
+
+        echo '<p class="displaying-num" style="color:#666;">' . (int) $meta['total'] . ' items</p>';
 
         $header_base = array(
             'page' => 'moda-database',
@@ -314,6 +386,8 @@ class Moda_Admin {
         echo '</p>';
         echo '</form>';
 
+        echo '<p class="displaying-num" style="color:#666;">' . (int) $meta['total'] . ' items</p>';
+
         $header_base = array(
             'page' => 'moda-celebrities',
             'q' => $q,
@@ -399,7 +473,7 @@ class Moda_Admin {
         echo '</form>';
 
         echo '<hr />';
-        echo '<h2>Linked Stylists</h2>';
+        echo '<h2>Linked Stylists (' . count($celebrity['stylists']) . ')</h2>';
         echo '<table class="widefat striped"><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Notes</th><th></th></tr></thead><tbody>';
         if (empty($celebrity['stylists'])) {
             echo '<tr><td colspan="6">No linked stylists.</td></tr>';
@@ -440,14 +514,24 @@ class Moda_Admin {
         echo '<p><a href="' . esc_url(admin_url('admin.php?page=moda-database')) . '">&larr; Back to list</a></p>';
         $this->render_notice();
 
-        echo '<h2>' . esc_html($stylist['full_name']) . '</h2>';
-        echo '<p><strong>Email:</strong> ' . esc_html((string) $stylist['email']) . '</p>';
-        echo '<p><strong>Phone:</strong> ' . esc_html((string) $stylist['phone']) . '</p>';
-        echo '<p><strong>Instagram:</strong> ' . esc_html((string) $stylist['instagram']) . '</p>';
-        echo '<p><strong>Website:</strong> ' . esc_html((string) $stylist['website']) . '</p>';
+        echo '<h2>Edit Stylist</h2>';
+        echo '<form method="post">';
+        wp_nonce_field('moda_admin_action', 'moda_nonce');
+        echo '<input type="hidden" name="moda_action" value="update_stylist" />';
+        echo '<input type="hidden" name="stylist_id" value="' . (int) $id . '" />';
+        echo '<table class="form-table"><tbody>';
+        echo '<tr><th>ID</th><td>' . (int) $id . '</td></tr>';
+        echo '<tr><th>Name</th><td><input type="text" name="full_name" required value="' . esc_attr((string) $stylist['full_name']) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th>Email</th><td><input type="email" name="email" value="' . esc_attr((string) $stylist['email']) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th>Phone</th><td><input type="text" name="phone" value="' . esc_attr((string) $stylist['phone']) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th>Instagram</th><td><input type="text" name="instagram" value="' . esc_attr((string) $stylist['instagram']) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th>Website</th><td><input type="url" name="website" value="' . esc_attr((string) $stylist['website']) . '" class="regular-text" /></td></tr>';
+        echo '</tbody></table>';
+        echo '<button class="button button-primary" type="submit">Save Stylist</button>';
+        echo '</form>';
 
         echo '<hr />';
-        echo '<h2>Representatives</h2>';
+        echo '<h2>Representatives (' . count($stylist['reps']) . ')</h2>';
         echo '<table class="widefat striped"><thead><tr><th>Name</th><th>Company</th><th>Email</th><th>Phone</th><th>Territory</th><th></th></tr></thead><tbody>';
         if (empty($stylist['reps'])) {
             echo '<tr><td colspan="6">No reps.</td></tr>';
@@ -465,7 +549,7 @@ class Moda_Admin {
                 echo '<input type="hidden" name="moda_action" value="delete_rep" />';
                 echo '<input type="hidden" name="stylist_id" value="' . (int) $id . '" />';
                 echo '<input type="hidden" name="rep_id" value="' . (int) $rep['id'] . '" />';
-                echo '<button class="button button-secondary" type="submit">Delete</button>';
+                echo '<button class="button button-secondary" type="submit" onclick="return confirm(\'Delete this rep?\')">Delete</button>';
                 echo '</form>';
                 echo '</td>';
                 echo '</tr>';
@@ -489,7 +573,7 @@ class Moda_Admin {
         echo '</form>';
 
         echo '<hr />';
-        echo '<h2>Celebrities</h2>';
+        echo '<h2>Celebrities (' . count($stylist['celebrities']) . ')</h2>';
         echo '<table class="widefat striped"><thead><tr><th>ID</th><th>Name</th><th>Industry</th><th>Notes</th><th></th></tr></thead><tbody>';
         if (empty($stylist['celebrities'])) {
             echo '<tr><td colspan="5">No celebrities attached.</td></tr>';
@@ -506,7 +590,7 @@ class Moda_Admin {
                 echo '<input type="hidden" name="moda_action" value="detach_celebrity" />';
                 echo '<input type="hidden" name="stylist_id" value="' . (int) $id . '" />';
                 echo '<input type="hidden" name="celebrity_id" value="' . (int) $celebrity['id'] . '" />';
-                echo '<button class="button button-secondary" type="submit">Detach</button>';
+                echo '<button class="button button-secondary" type="submit" onclick="return confirm(\'Detach this celebrity?\')">Detach</button>';
                 echo '</form>';
                 echo '</td>';
                 echo '</tr>';
@@ -536,7 +620,7 @@ class Moda_Admin {
         if ($notice === '') {
             return;
         }
-        $class = $type === 'success' ? 'notice notice-success' : 'notice notice-error';
+        $class = $type === 'success' ? 'notice notice-success is-dismissible' : 'notice notice-error is-dismissible';
         echo '<div class="' . esc_attr($class) . '"><p>' . esc_html($notice) . '</p></div>';
     }
 

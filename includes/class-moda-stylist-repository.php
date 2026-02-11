@@ -49,7 +49,7 @@ class Moda_Stylist_Repository {
         }
         $sort_sql = "{$sort_column} {$sort_dir}, s.id DESC";
 
-        $joins = '';
+        $filter_joins = '';
         $where_parts = array('1=1');
         $params = array();
 
@@ -65,11 +65,11 @@ class Moda_Stylist_Repository {
 
         if ($celebrity_filter !== '') {
             if (ctype_digit($celebrity_filter)) {
-                $joins .= " INNER JOIN {$this->links_table} l_filter ON l_filter.stylist_id = s.id";
+                $filter_joins .= " INNER JOIN {$this->links_table} l_filter ON l_filter.stylist_id = s.id";
                 $where_parts[] = 'l_filter.celebrity_id = %d';
                 $params[] = (int) $celebrity_filter;
             } else {
-                $joins .= " INNER JOIN {$this->links_table} l_filter ON l_filter.stylist_id = s.id
+                $filter_joins .= " INNER JOIN {$this->links_table} l_filter ON l_filter.stylist_id = s.id
                             INNER JOIN {$this->celebrities_table} c_filter ON c_filter.id = l_filter.celebrity_id";
                 $where_parts[] = 'c_filter.full_name LIKE %s';
                 $params[] = '%' . $this->wpdb->esc_like($celebrity_filter) . '%';
@@ -80,10 +80,12 @@ class Moda_Stylist_Repository {
 
         $count_sql = "SELECT COUNT(DISTINCT s.id)
             FROM {$this->stylists_table} s
-            {$joins}
+            {$filter_joins}
             WHERE {$where_sql}";
         $count_query = !empty($params) ? $this->wpdb->prepare($count_sql, $params) : $count_sql;
         $total = (int) $this->wpdb->get_var($count_query);
+
+        $celebrity_count_sub = "(SELECT COUNT(*) FROM {$this->links_table} lc WHERE lc.stylist_id = s.id)";
 
         $data_sql = "SELECT
                 s.id,
@@ -94,10 +96,9 @@ class Moda_Stylist_Repository {
                 s.website,
                 s.created_at,
                 s.updated_at,
-                COUNT(DISTINCT l.celebrity_id) AS celebrity_count
+                {$celebrity_count_sub} AS celebrity_count
             FROM {$this->stylists_table} s
-            LEFT JOIN {$this->links_table} l ON l.stylist_id = s.id
-            {$joins}
+            {$filter_joins}
             WHERE {$where_sql}
             GROUP BY s.id
             ORDER BY {$sort_sql}
@@ -424,9 +425,16 @@ class Moda_Stylist_Repository {
         return $this->wpdb->get_results($sql, ARRAY_A);
     }
 
-    public function seed_data(int $stylists, int $celebs, int $links): void {
+    public function seed_data(int $stylists, int $celebs, int $links, bool $truncate = false): void {
         $industries = array('Music', 'Film/TV', 'Sports', 'Fashion');
         $now = current_time('mysql');
+
+        if ($truncate) {
+            $this->wpdb->query("TRUNCATE TABLE {$this->links_table}");
+            $this->wpdb->query("TRUNCATE TABLE {$this->reps_table}");
+            $this->wpdb->query("TRUNCATE TABLE {$this->stylists_table}");
+            $this->wpdb->query("TRUNCATE TABLE {$this->celebrities_table}");
+        }
 
         $this->seed_celebrities_batch($celebs, $industries, $now);
         $this->seed_stylists_batch($stylists, $now);
@@ -437,6 +445,11 @@ class Moda_Stylist_Repository {
             return;
         }
 
+        $this->seed_links_batch($stylist_ids, $celebrity_ids, $links);
+        $this->seed_reps_batch($stylist_ids, $now);
+    }
+
+    private function seed_links_batch(array $stylist_ids, array $celebrity_ids, int $links): void {
         $existing_links = (int) $this->wpdb->get_var("SELECT COUNT(*) FROM {$this->links_table}");
         $target_new_links = max(0, $links - $existing_links);
         if ($target_new_links === 0) {
@@ -467,6 +480,39 @@ class Moda_Stylist_Repository {
                 $inserted_total += $affected;
             }
             $attempts++;
+        }
+    }
+
+    private function seed_reps_batch(array $stylist_ids, string $now): void {
+        $companies = array('CAA', 'WME', 'UTA', 'ICM Partners', 'Paradigm', 'APA Agency');
+        $territories = array('US', 'EU', 'Global', 'UK', 'Asia-Pacific');
+        $chunk_size = 500;
+        $total = count($stylist_ids);
+
+        for ($offset = 0; $offset < $total; $offset += $chunk_size) {
+            $slice = array_slice($stylist_ids, $offset, $chunk_size);
+            $placeholders = array();
+            $params = array();
+
+            foreach ($slice as $sid) {
+                $rep_count = rand(1, 3);
+                for ($r = 0; $r < $rep_count; $r++) {
+                    $placeholders[] = '(%d, %s, %s, %s, %s, %s, %s, %s)';
+                    $params[] = (int) $sid;
+                    $params[] = sprintf('Rep %d-%d', $sid, $r + 1);
+                    $params[] = $companies[array_rand($companies)];
+                    $params[] = sprintf('rep%d_%d@example.com', $sid, $r + 1);
+                    $params[] = sprintf('+1-555-%04d', rand(0, 9999));
+                    $params[] = $territories[array_rand($territories)];
+                    $params[] = $now;
+                    $params[] = $now;
+                }
+            }
+
+            if (!empty($placeholders)) {
+                $sql = "INSERT INTO {$this->reps_table} (stylist_id, rep_name, company, rep_email, rep_phone, territory, created_at, updated_at) VALUES " . implode(', ', $placeholders);
+                $this->wpdb->query($this->wpdb->prepare($sql, $params));
+            }
         }
     }
 

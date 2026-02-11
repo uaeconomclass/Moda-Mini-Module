@@ -35,23 +35,32 @@ class Moda_Seeder {
      * [--links=<count>]
      * : Number of stylist-celebrity links to generate.
      *
+     * [--truncate]
+     * : Truncate all tables before seeding.
+     *
      * ## EXAMPLES
      *
      *     wp moda seed --stylists=2000 --celebs=5000 --links=30000
+     *     wp moda seed --truncate
      */
     public function seed_command(array $args, array $assoc_args): void {
         $stylists = isset($assoc_args['stylists']) ? (int) $assoc_args['stylists'] : 2000;
         $celebs = isset($assoc_args['celebs']) ? (int) $assoc_args['celebs'] : 5000;
         $links = isset($assoc_args['links']) ? (int) $assoc_args['links'] : 30000;
+        $truncate = isset($assoc_args['truncate']);
 
         if ($stylists <= 0 || $celebs <= 0 || $links <= 0) {
             WP_CLI::error('All values must be > 0.');
             return;
         }
 
+        if ($truncate) {
+            WP_CLI::log('Truncating existing data...');
+        }
+
         WP_CLI::log(sprintf('Seeding: stylists=%d, celebs=%d, links=%d', $stylists, $celebs, $links));
         $start = microtime(true);
-        $this->repository->seed_data($stylists, $celebs, $links);
+        $this->repository->seed_data($stylists, $celebs, $links, $truncate);
         $duration = microtime(true) - $start;
         WP_CLI::success(sprintf('Seed completed in %.2f seconds.', $duration));
     }

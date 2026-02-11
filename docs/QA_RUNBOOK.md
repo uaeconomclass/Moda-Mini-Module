@@ -30,10 +30,17 @@ wp moda seed --stylists=2000 --celebs=5000 --links=30000
 wp moda verify --min-stylists=2000 --min-celebs=5000 --min-links=30000
 ```
 
+To re-seed cleanly:
+
+```bash
+wp moda seed --truncate --stylists=2000 --celebs=5000 --links=30000
+```
+
 Expected:
 
 1. Seed command completes successfully.
 2. Verify command passes minimum counts.
+3. Reps are generated automatically (1-3 per stylist).
 
 ## 3. REST Read Endpoints
 
@@ -115,16 +122,41 @@ Expected:
 
 ## 6. Admin UI Validation
 
-1. Open `WP Admin -> Moda Database`.
-2. Search by stylist name.
-3. Filter by celebrity.
-4. Navigate pagination.
-5. Open stylist detail.
-6. Add/delete rep.
-7. Attach/detach celebrity.
+### Stylists List
+
+1. Open `WP Admin -> Moda Database -> Stylists`.
+2. Verify total item count is displayed.
+3. Create a stylist using the "+ Add New Stylist" form.
+4. Search by stylist name.
+5. Filter by celebrity (ID or name).
+6. Navigate pagination.
+7. Sort by clicking column headers.
+8. Click a stylist name to open detail page.
+
+### Stylist Detail
+
+1. Edit stylist fields (name, email, phone, instagram, website) and save.
+2. Add a rep using the "Add Rep" form.
+3. Delete a rep — confirm dialog should appear.
+4. Attach a celebrity (by ID or by name to create new).
+5. Detach a celebrity — confirm dialog should appear.
+6. Verify section headers show counts: "Representatives (N)", "Celebrities (N)".
+
+### Celebrities List
+
+1. Open `WP Admin -> Moda Database -> Celebrities`.
+2. Verify total item count is displayed.
+3. Search by name and filter by ID.
+4. Sort by column headers.
+5. Click "View Stylists" to see related stylists.
+
+### Celebrity Detail
+
+1. Click a celebrity name to open detail page.
+2. Edit celebrity fields (name, industry) and save.
+3. Verify linked stylists list with count in header.
 
 Expected:
 
-1. All operations persist correctly in page reload.
-2. Error/success notices appear as expected.
-
+1. All operations persist correctly on page reload.
+2. Dismissible success/error notices appear as expected.

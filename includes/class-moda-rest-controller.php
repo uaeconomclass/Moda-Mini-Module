@@ -85,6 +85,9 @@ class Moda_REST_Controller {
         if ($per_page <= 0) {
             $per_page = 20;
         }
+        if ($per_page > 100) {
+            $per_page = 100;
+        }
 
         $q = sanitize_text_field((string) $request->get_param('q'));
         $sort = sanitize_text_field((string) $request->get_param('sort'));
