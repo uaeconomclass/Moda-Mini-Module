@@ -44,6 +44,15 @@ class Moda_Admin {
             'moda-stylist-detail',
             array($this, 'render_stylist_detail_page')
         );
+
+        add_submenu_page(
+            null,
+            'Celebrity Detail',
+            'Celebrity Detail',
+            'manage_options',
+            'moda-celebrity-detail',
+            array($this, 'render_celebrity_detail_page')
+        );
     }
 
     public function handle_post_actions(): void {
@@ -118,6 +127,40 @@ class Moda_Admin {
                 $this->redirect_with_notice($redirect, 'Failed to detach celebrity.', 'error');
             }
             $this->redirect_with_notice($redirect, 'Celebrity detached.', 'success');
+        }
+
+        if ($action === 'update_celebrity') {
+            $celebrity_id = (int) ($_POST['celebrity_id'] ?? 0);
+            if ($celebrity_id <= 0 || !$this->repository->celebrity_exists($celebrity_id)) {
+                $this->redirect_with_notice(admin_url('admin.php?page=moda-celebrities'), 'Celebrity not found.', 'error');
+            }
+
+            $full_name = sanitize_text_field(wp_unslash((string) ($_POST['full_name'] ?? '')));
+            $industry = sanitize_text_field(wp_unslash((string) ($_POST['industry'] ?? '')));
+            if ($full_name === '') {
+                $this->redirect_with_notice(
+                    admin_url('admin.php?page=moda-celebrity-detail&id=' . $celebrity_id),
+                    'Celebrity name is required.',
+                    'error'
+                );
+            }
+
+            $ok = $this->repository->update_celebrity($celebrity_id, array(
+                'full_name' => $full_name,
+                'industry' => $industry,
+            ));
+            if (!$ok) {
+                $this->redirect_with_notice(
+                    admin_url('admin.php?page=moda-celebrity-detail&id=' . $celebrity_id),
+                    'Failed to update celebrity.',
+                    'error'
+                );
+            }
+            $this->redirect_with_notice(
+                admin_url('admin.php?page=moda-celebrity-detail&id=' . $celebrity_id),
+                'Celebrity updated.',
+                'success'
+            );
         }
     }
 
@@ -223,6 +266,7 @@ class Moda_Admin {
             echo '<tr><td colspan="6">No celebrities found.</td></tr>';
         } else {
             foreach ($items as $item) {
+                $detail_url = admin_url('admin.php?page=moda-celebrity-detail&id=' . (int) $item['id']);
                 $stylists_url = add_query_arg(
                     array(
                         'page' => 'moda-database',
@@ -233,7 +277,7 @@ class Moda_Admin {
 
                 echo '<tr>';
                 echo '<td>' . (int) $item['id'] . '</td>';
-                echo '<td>' . esc_html((string) $item['full_name']) . '</td>';
+                echo '<td><a href="' . esc_url($detail_url) . '">' . esc_html((string) $item['full_name']) . '</a></td>';
                 echo '<td>' . esc_html((string) $item['industry']) . '</td>';
                 echo '<td>' . (int) $item['stylist_count'] . '</td>';
                 echo '<td>' . esc_html((string) $item['updated_at']) . '</td>';
@@ -248,6 +292,61 @@ class Moda_Admin {
             'q' => $q,
             'celebrity_id' => $celebrity_id > 0 ? $celebrity_id : '',
         ));
+        echo '</div>';
+    }
+
+    public function render_celebrity_detail_page(): void {
+        if (!current_user_can('manage_options')) {
+            wp_die('Insufficient permissions.');
+        }
+
+        $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+        if ($id <= 0) {
+            wp_die('Invalid celebrity id.');
+        }
+
+        $celebrity = $this->repository->get_celebrity($id);
+        if (!$celebrity) {
+            wp_die('Celebrity not found.');
+        }
+
+        echo '<div class="wrap">';
+        echo '<h1>Celebrity Detail</h1>';
+        echo '<p><a href="' . esc_url(admin_url('admin.php?page=moda-celebrities')) . '">&larr; Back to celebrities</a></p>';
+        $this->render_notice();
+
+        echo '<h2>Edit Celebrity</h2>';
+        echo '<form method="post">';
+        wp_nonce_field('moda_admin_action', 'moda_nonce');
+        echo '<input type="hidden" name="moda_action" value="update_celebrity" />';
+        echo '<input type="hidden" name="celebrity_id" value="' . (int) $id . '" />';
+        echo '<table class="form-table"><tbody>';
+        echo '<tr><th>ID</th><td>' . (int) $id . '</td></tr>';
+        echo '<tr><th>Name</th><td><input type="text" name="full_name" required value="' . esc_attr((string) $celebrity['full_name']) . '" class="regular-text" /></td></tr>';
+        echo '<tr><th>Industry</th><td><input type="text" name="industry" value="' . esc_attr((string) $celebrity['industry']) . '" class="regular-text" /></td></tr>';
+        echo '</tbody></table>';
+        echo '<button class="button button-primary" type="submit">Save Celebrity</button>';
+        echo '</form>';
+
+        echo '<hr />';
+        echo '<h2>Linked Stylists</h2>';
+        echo '<table class="widefat striped"><thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Phone</th><th>Notes</th><th></th></tr></thead><tbody>';
+        if (empty($celebrity['stylists'])) {
+            echo '<tr><td colspan="6">No linked stylists.</td></tr>';
+        } else {
+            foreach ($celebrity['stylists'] as $stylist) {
+                $stylist_url = admin_url('admin.php?page=moda-stylist-detail&id=' . (int) $stylist['id']);
+                echo '<tr>';
+                echo '<td>' . (int) $stylist['id'] . '</td>';
+                echo '<td>' . esc_html((string) $stylist['full_name']) . '</td>';
+                echo '<td>' . esc_html((string) $stylist['email']) . '</td>';
+                echo '<td>' . esc_html((string) $stylist['phone']) . '</td>';
+                echo '<td>' . esc_html((string) $stylist['notes']) . '</td>';
+                echo '<td><a href="' . esc_url($stylist_url) . '">Open Stylist</a></td>';
+                echo '</tr>';
+            }
+        }
+        echo '</tbody></table>';
         echo '</div>';
     }
 

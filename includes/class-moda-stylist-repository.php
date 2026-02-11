@@ -195,6 +195,29 @@ class Moda_Stylist_Repository {
         return $stylist;
     }
 
+    public function get_celebrity(int $id): ?array {
+        $celebrity_sql = $this->wpdb->prepare(
+            "SELECT * FROM {$this->celebrities_table} WHERE id = %d",
+            $id
+        );
+        $celebrity = $this->wpdb->get_row($celebrity_sql, ARRAY_A);
+        if (!$celebrity) {
+            return null;
+        }
+
+        $stylists_sql = $this->wpdb->prepare(
+            "SELECT s.id, s.full_name, s.email, s.phone, l.notes
+             FROM {$this->links_table} l
+             INNER JOIN {$this->stylists_table} s ON s.id = l.stylist_id
+             WHERE l.celebrity_id = %d
+             ORDER BY s.full_name ASC",
+            $id
+        );
+        $celebrity['stylists'] = $this->wpdb->get_results($stylists_sql, ARRAY_A);
+
+        return $celebrity;
+    }
+
     public function create_stylist(array $data): int {
         $now = current_time('mysql');
         $inserted = $this->wpdb->insert(
@@ -235,6 +258,31 @@ class Moda_Stylist_Repository {
 
         $updated = $this->wpdb->update(
             $this->stylists_table,
+            $data,
+            array('id' => $id),
+            $format,
+            array('%d')
+        );
+        return $updated !== false;
+    }
+
+    public function update_celebrity(int $id, array $data): bool {
+        if (empty($data)) {
+            return false;
+        }
+
+        $data['updated_at'] = current_time('mysql');
+        $format = array();
+        foreach (array_keys($data) as $field) {
+            if ($field === 'updated_at') {
+                $format[] = '%s';
+                continue;
+            }
+            $format[] = '%s';
+        }
+
+        $updated = $this->wpdb->update(
+            $this->celebrities_table,
             $data,
             array('id' => $id),
             $format,
